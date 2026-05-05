@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="lv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🐸 Frog Quiz</title>
+
+<style>
+body{font-family:Arial;background:linear-gradient(135deg,#c8e6c9,#81c784);display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+.card{background:#fff;padding:24px;border-radius:20px;max-width:900px;width:95%;text-align:center;box-shadow:0 10px 25px rgba(0,0,0,.2)}
+button{margin:6px;padding:10px;border:none;border-radius:10px;width:90%;cursor:pointer}
+.single{background:#e3f2fd}
+.multi{background:#fff3e0}
+.selected{background:#1b5e20!important;color:#fff}
+.correct{background:#2e7d32!important;color:#fff}
+.wrong{background:#c62828!important;color:#fff}
+.hidden{display:none}
+.progress{height:10px;background:#eee;border-radius:10px;margin:10px 0}
+.bar{height:100%;background:#43a047;width:0}
+.medal{font-size:45px;margin:10px}
+.diamond{font-size:55px;animation:pulse 1.5s infinite}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1)}}
+.good{background:#c8e6c9;padding:6px;border-radius:8px;margin:4px}
+.bad{background:#ffcdd2;padding:6px;border-radius:8px;margin:4px}
+.mid{background:#fff9c4;padding:6px;border-radius:8px;margin:4px}
+</style>
+</head>
+
+<body>
+
+<div class="card" id="intro">
+<h1>🐸 Frog Quiz</h1>
+<button onclick="setLang('lv')">Latviešu</button>
+<button onclick="setLang('en')">English</button>
+<button onclick="setLang('ru')">Русский</button>
+</div>
+
+<div class="card hidden" id="game">
+<div id="score"></div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+
+<h2 id="question"></h2>
+<div id="answers"></div>
+
+<div id="result"></div>
+
+<button id="checkBtn" onclick="check()">Check</button>
+<button id="nextBtn" onclick="nextQ()" style="display:none">Next</button>
+
+<div id="final"></div>
+</div>
+
+<script>
+let lang="lv";
+
+/* =========================
+   TRANSLATIONS
+========================= */
+const T={
+lv:{points:"Punkti",acc:"Precizitāte",retry:"Mēģināt vēlreiz",wrong:"Nepareizi — mēģini vēlreiz",special:"Tu esi īpašs savā veidā"},
+en:{points:"Points",acc:"Accuracy",retry:"Try again",wrong:"Wrong — try again",special:"You are special in your own way"},
+ru:{points:"Очки",acc:"Точность",retry:"Попробовать снова",wrong:"Неправильно — попробуй снова",special:"Ты особенный по-своему"}
+};
+
+function tr(k){return T[lang][k];}
+function setLang(l){lang=l;startGame();}
+
+/* =========================
+   GAME STATE
+========================= */
+let questions=[],i=0,score=0,selected=[],results=[],attempts=[],partials=0;
+
+/* =========================
+   🔥 QUESTIONS GO HERE
+   (IMPORT FROM FILE 2)
+========================= */
+const QUESTION_BANK = []; // 👈 COPY FILE 2 HERE
+
+/* =========================
+   GAME SETUP
+========================= */
+function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+
+function buildGame(){
+questions=[
+...shuffle(QUESTION_BANK.easy).slice(0,6),
+...shuffle(QUESTION_BANK.medium).slice(0,6),
+...shuffle(QUESTION_BANK.hard).slice(0,6),
+...shuffle(QUESTION_BANK.expert).slice(0,4)
+];
+questions=shuffle(questions);
+}
+
+/* =========================
+   CORE GAME
+========================= */
+function startGame(){
+i=0;score=0;selected=[];results=[];attempts=[];partials=0;
+buildGame();
+intro.classList.add("hidden");
+game.classList.remove("hidden");
+show();
+}
+
+function show(){
+selected=[];
+let q=questions[i];
+attempts[i]=attempts[i]||0;
+
+question.innerText=q.q[lang];
+answers.innerHTML="";
+
+q.a[lang].forEach((x,idx)=>{
+let b=document.createElement("button");
+b.innerText=x;
+b.className=q.type==="multi"?"multi":"single";
+b.onclick=()=>select(idx,b,q);
+answers.appendChild(b);
+});
+
+update();
+}
+
+function select(idx,b,q){
+if(q.type==="multi"){
+if(selected.includes(idx)){selected=selected.filter(x=>x!==idx);b.classList.remove("selected")}
+else{selected.push(idx);b.classList.add("selected")}
+}else{
+selected=[idx];
+document.querySelectorAll("#answers button").forEach(x=>x.classList.remove("selected"));
+b.classList.add("selected");
+}
+}
+
+function check(){
+let q=questions[i];
+attempts[i]++;
+
+let btns=document.querySelectorAll("#answers button");
+let gained=0,status="wrong";
+
+if(q.type==="multi"){
+let correctCount=selected.filter(x=>q.c.includes(x)).length;
+let ratio=correctCount/q.c.length;
+
+if(ratio===1 && selected.length===q.c.length){
+gained=q.p;status="correct";
+}else if(ratio>0){
+gained=Math.round(q.p*ratio);
+status="partial";
+partials++;
+}
+}else{
+if(selected[0]===q.c[0]){
+gained=q.p;status="correct";
+}
+}
+
+if(attempts[i]===2) gained=Math.floor(gained/2);
+
+score+=gained;
+
+if(status==="correct")results.push({q:q.q[lang],s:"good"});
+else if(status==="partial")results.push({q:q.q[lang],s:"mid"});
+else{
+if(attempts[i]>=2)results.push({q:q.q[lang],s:"bad"});
+else{result.innerText=tr("wrong");selected=[];return;}
+}
+
+btns.forEach((b,idx)=>{
+if(q.c.includes(idx)) b.classList.add("correct");
+else if(selected.includes(idx)) b.classList.add("wrong");
+});
+
+checkBtn.style.display="none";
+nextBtn.style.display="block";
+update();
+}
+
+function nextQ(){
+i++;
+if(i<questions.length){
+checkBtn.style.display="block";
+nextBtn.style.display="none";
+show();
+}else finish();
+}
+
+function update(){
+scoreEl.innerText=tr("points")+": "+score;
+bar.style.width=(i/questions.length*100)+"%";
+}
+
+/* =========================
+   MEDALS
+========================= */
+function finish(){
+let mistakes=results.filter(r=>r.s==="bad").length + Math.floor(partials/2);
+let correct=results.filter(r=>r.s==="good").length;
+let accuracy=Math.round(correct/results.length*100);
+
+let maxScore=questions.reduce((s,q)=>s+q.p,0);
+
+let medal="",extra="";
+
+if(score===0){medal="❓";extra=tr("special")}
+else if(score===maxScore && mistakes===0){medal="🏆✨"}
+else if(mistakes<=1){medal="💎"}
+else if(mistakes<=2){medal="🥇"}
+else if(mistakes<=4){medal="🥈"}
+else if(mistakes<=6){medal="🪨"}
+else if(mistakes<=10){medal="🪵"}
+else medal="◌";
+
+let html=`<h2>${tr("points")}: ${score}</h2>`;
+html+=`<p>${tr("acc")}: ${accuracy}%</p>`;
+html+=`<div class="medal">${medal}</div>`;
+if(extra) html+=`<p>${extra}</p>`;
+
+html+=`<button onclick="startGame()">${tr("retry")}</button>`;
+
+results.forEach(r=>{
+html+=`<div class="${r.s==="good"?"good":r.s==="bad"?"bad":"mid"}">
+${r.s==="good"?"✔️":r.s==="bad"?"❌":"⚠️"} ${r.q}</div>`;
+});
+
+final.innerHTML=html;
+}
+</script>
+
+</body>
+</html>
